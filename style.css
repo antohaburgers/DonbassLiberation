@@ -71,3 +71,25 @@ button,canvas{touch-action:none;-webkit-user-select:none;user-select:none}
  .menu-card>small{font-size:9px}
  .pwa-section{margin-top:9px;padding-top:8px}
 }
+
+
+/* v0.8: one-handed mobile grenade control + role/goal info */
+#battleInfo{max-width:275px;color:#ffe1a5;font-size:9px;line-height:1.45;letter-spacing:.5px;margin-top:7px}
+.grenadeStat{border-left:1px solid #e8d6a459;padding-left:10px}
+.grenadeStat b{color:#f2dc9f}
+#grenadeBtn{background:#68764cbf!important;border:1px solid #c4d69cae!important}
+#grenadeBtn:active{background:#9aaa6bcf!important}
+@media(pointer:coarse){
+ #battleInfo{max-width:275px;font-size:8px;line-height:1.25}
+ #combatHud{bottom:max(160px,calc(env(safe-area-inset-bottom) + 150px));min-width:218px}
+ .grenadeStat{padding-left:7px}
+ #actions{gap:5px}
+ #grenadeBtn{font-size:9px}
+}
+@media (max-width:690px) and (pointer:coarse){
+ #battleInfo{font-size:7px;max-width:175px}
+ #combatHud{transform:scale(.87);transform-origin:bottom right}
+ #actions{gap:3px}
+ #actions button{height:45px;width:45px;font-size:8px}
+ #fireBtn{width:60px!important;height:60px!important}
+}
