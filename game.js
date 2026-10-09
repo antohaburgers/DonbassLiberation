@@ -3,7 +3,7 @@ import {generate,height,clamp,randomizer} from './world-data.js?v=02';
 import {WorldView} from './world-render.js?v=04';
 import {createInput} from './input.js?v=05';
 import {FirstPersonWeapon} from './weapon.js?v=05';
-import {EnemySystem} from './enemies.js?v=05';
+import {EnemySystem} from './enemies.js?v=06';
 import {CombatAudio} from './combat-audio.js?v=05';
 
 const $=id=>document.getElementById(id);
