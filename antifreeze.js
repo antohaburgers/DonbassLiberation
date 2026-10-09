@@ -47,7 +47,7 @@ export class AntifreezeFX{
     vx:Math.cos(a)*speed+dir.x*2.0,
     vy:lift+dir.y,
     vz:Math.sin(a)*speed+dir.z*2.0,
-    size:(.035+r()*.075)*(force>.8?1.25:1)
+    size:(.08+r()*.13)*(force>.8?1.18:1)
    });
    this.mesh.setColorAt(slot,new THREE.Color(palette[Math.floor(r()*palette.length)]));
   }
