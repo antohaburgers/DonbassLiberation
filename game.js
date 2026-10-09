@@ -5,14 +5,17 @@ import {createInput} from './input.js?v=05';
 import {FirstPersonWeapon} from './weapon.js?v=05';
 import {EnemySystem} from './enemies.js?v=06';
 import {CombatAudio} from './combat-audio.js?v=05';
+import {SupplySystem} from './supplies.js?v=08';
+import {GrenadeSystem} from './grenades.js?v=08';
 
 const $=id=>document.getElementById(id);
 const seedParam=new URLSearchParams(location.search).get('seed');
 const seed=seedParam&&/^\d+$/.test(seedParam)?Number(seedParam)>>>0:Math.floor(Math.random()*4294967295);
 const rand=randomizer(seed^0x8d1fa3);
-let world,scene,camera,renderer,controls,enemies,gun,audio,running=false;
+let world,scene,camera,renderer,controls,enemies,gun,audio,supplies,grenades,running=false;
 const player={x:0,z:0,yaw:0,pitch:0,jumpY:0,vy:0,hp:100,dead:false,respawnTime:0};
-const ammo={mag:30,reserve:540,maxMag:30,cooldown:0,reloadTime:0,reloadLength:1.6};
+const ammo={mag:30,reserve:210,maxMag:30,cooldown:0,reloadTime:0,reloadLength:1.6};
+const inventory={grenades:2,maxGrenades:4};
 let frameTime=performance.now(),elapsed=0,hudTime=0,fpsSmooth=60,toastTime=0,map,flashHit=0,flashDamage=0,gameWon=false;
 const vForward=new THREE.Vector3(),vRight=new THREE.Vector3(),vUp=new THREE.Vector3(),fireRay=new THREE.Vector3();
 
@@ -23,7 +26,7 @@ function enemyShot(enemy,hit,dist){
  if(!running||player.dead)return;
  audio.enemy(dist);
  if(hit){
-  player.hp=Math.max(0,player.hp-7);
+  player.hp=Math.max(0,player.hp-(enemy.damage||7));
   flashDamage=Math.min(.72,flashDamage+.25);
   audio.hurt();
   if(player.hp<=0){
@@ -56,6 +59,11 @@ function init(){
  gun=new FirstPersonWeapon(camera);
  audio=new CombatAudio();
  enemies=new EnemySystem(scene,map,world,enemyShot,onKill);
+ supplies=new SupplySystem(scene,map);
+ grenades=new GrenadeSystem(scene,enemies,(count)=>{
+  audio.explosion();
+  if(count)showToast('АНТИФРИЗНЫЙ ФЕЙЕРВЕРК • ПОПАДАНИЙ: '+count);
+ });
  addEventListener('resize',resize);
  $('play').addEventListener('click',()=>{
   audio.unlock();running=true;$('menu').classList.add('hidden');
@@ -125,6 +133,33 @@ function shoot(){
  }
  if(ammo.mag<=0&&ammo.reserve>0)startReload();
 }
+
+function pickupSupply(type){
+ if(type==='ammo'){
+  if(ammo.reserve>=630)return false;
+  ammo.reserve=Math.min(630,ammo.reserve+90);
+  showToast('ЯЩИК СНАРЯЖЕНИЯ • +90 ПАТРОНОВ');audio.hit();return true;
+ }
+ if(type==='medkit'){
+  if(player.hp>=100)return false;
+  player.hp=Math.min(100,player.hp+45);
+  showToast('РЕМКОМПЛЕКТ • +45 ЗДОРОВЬЯ');audio.hit();return true;
+ }
+ if(type==='grenade'){
+  if(inventory.grenades>=inventory.maxGrenades)return false;
+  inventory.grenades=Math.min(inventory.maxGrenades,inventory.grenades+2);
+  showToast('ГРАНАТЫ • ПОПОЛНЕНИЕ ЗАПАСА');audio.reload();return true;
+ }
+ return false;
+}
+function throwGrenade(){
+ if(player.dead||inventory.grenades<1)return;
+ inventory.grenades--;
+ camera.updateMatrixWorld(true);
+ camera.getWorldDirection(vForward);
+ grenades.throw(camera.position.clone().addScaledVector(vForward,.55),vForward);
+ audio.reload();
+}
 function updateCombat(dt,input){
  ammo.cooldown=Math.max(0,ammo.cooldown-dt);
  if(ammo.reloadTime>0){
@@ -133,6 +168,7 @@ function updateCombat(dt,input){
  }
  if(input.reload)startReload();
  if(input.fire)shoot();
+ if(input.grenade)throwGrenade();
  const moving=Math.abs(input.forward)+Math.abs(input.strafe)>.02;
  gun.update(dt,moving,input.sprint,input.dyaw);
 }
@@ -153,7 +189,7 @@ function capture(){
 }
 function respawn(){
  player.dead=false;player.hp=100;player.jumpY=0;player.vy=0;
- ammo.mag=30;ammo.reserve=Math.max(180,ammo.reserve);ammo.reloadTime=0;
+ ammo.mag=30;ammo.reserve=Math.max(90,ammo.reserve);ammo.reloadTime=0;inventory.grenades=Math.max(1,inventory.grenades);
  const entry=map.roads[5].points[26];
  player.x=entry.x;player.z=entry.z;flashDamage=0;showToast('БОЕЦ ВЕРНУЛСЯ В СТРОЙ');
 }
@@ -200,6 +236,12 @@ function updateHud(){
  $('health').textContent=player.hp;$('healthFill').style.width=player.hp+'%';
  $('ammo').innerHTML=ammo.mag+' <i>/ '+ammo.reserve+'</i>';
  $('kills').textContent='УСТРАНЕНО: '+enemies.kills+' / '+enemies.bots.length;
+ $('grenades').textContent=inventory.grenades;
+ const mode=next?.type==='base'?'БАЗА • ТЯЖЁЛЫЕ РОБОТЫ':
+   next?.type==='camp'?'ЛЕС • БЫСТРЫЕ РОБОТЫ':
+   next?.type==='checkpoint'?'БЛОКПОСТ • ПУЛЕМЁТЧИКИ':
+   next?.type==='depot'?'СКЛАД • КОНТЕЙНЕРЫ':'ДЕРЕВНЯ • БОЙ У ДОМОВ';
+ $('battleInfo').textContent=next?mode+' • '+enemies.atPoiRemaining(next.id)+' ЗАЩИТНИКОВ':'ВСЕ ТОЧКИ ЗАХВАЧЕНЫ';
  drawMap();
 }
 function loop(now){
@@ -208,11 +250,15 @@ function loop(now){
  fpsSmooth=fpsSmooth*.92+(1/dt)*.08;
  if(running){
   if(player.dead){
+   grenades.update(dt,player);
    player.respawnTime-=dt;if(player.respawnTime<=0)respawn();
   }else{
    const input=controls.frame(dt);
    movement(dt,input);updateCamera();updateCombat(dt,input);
-   enemies.update(dt,player);capture();
+   grenades.update(dt,player);
+   enemies.update(dt,player);
+   supplies.update(dt,player,pickupSupply,elapsed);
+   capture();
   }
  }else{
   gun.update(dt,false,false);
