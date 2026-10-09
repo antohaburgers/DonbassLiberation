@@ -1,5 +1,6 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js';
 import {height,randomizer} from './world-data.js?v=02';
+import {AntifreezeFX} from './antifreeze.js?v=06';
 
 // Simple, deliberately inaccurate bots and playful Niva-style flying body parts.
 // No real-world unit insignia: olive field uniform with bright blue arm bands.
@@ -17,34 +18,67 @@ const temp=new THREE.Vector3();
 function piece(parent,geo,mt,scale,pos){
  const m=new THREE.Mesh(geo,mt);m.scale.set(...scale);m.position.set(...pos);parent.add(m);return m;
 }
+// Arms are posed from shoulder -> elbow -> real grip points instead of
+// dangling down from their shoulders. The rifle and muzzle sit at CHEST level.
+const AXIS_Y=new THREE.Vector3(0,1,0);
+function segment(group,a,b,width,depth,material){
+ const start=new THREE.Vector3(...a),end=new THREE.Vector3(...b);
+ const midpoint=start.clone().add(end).multiplyScalar(.5);
+ const dir=end.clone().sub(start);
+ const length=dir.length();
+ const mesh=piece(group,cube,material,[width,length,depth],[midpoint.x,midpoint.y,midpoint.z]);
+ mesh.quaternion.setFromUnitVectors(AXIS_Y,dir.normalize());
+ return mesh;
+}
+function interpolate(a,b,t){return a.map((v,i)=>v+(b[i]-v)*t);}
 function soldier(){
- const root=new THREE.Group(),torso=piece(root,cube,mats.suit[0],[.59,.79,.33],[0,1.14,0]);
- piece(root,cube,mats.webbing,[.63,.15,.39],[0,1.28,.02]);
- piece(root,cube,mats.webbing,[.35,.4,.15],[0,1.0,-.26]); // field pack
- piece(root,cube,mats.suit[1],[.52,.25,.35],[0,.69,0]);
- const head=piece(root,sphere,mats.skin,[.23,.26,.23],[0,1.73,.015]);
- piece(root,helmetGeo,mats.helmet,[.28,.18,.28],[0,1.91,-.005]);
- piece(root,cube,mats.visor,[.32,.055,.07],[0,1.86,.24]);
+ const root=new THREE.Group();
+ const torso=piece(root,cube,mats.suit[0],[.59,.79,.35],[0,1.14,0]);
+ piece(root,cube,mats.webbing,[.65,.16,.39],[0,1.29,.02]);
+ piece(root,cube,mats.webbing,[.35,.43,.16],[0,1.03,-.26]); // backpack
+ piece(root,cube,mats.suit[1],[.52,.26,.35],[0,.71,0]);
+ const head=piece(root,sphere,mats.skin,[.23,.26,.23],[0,1.75,.015]);
+ piece(root,helmetGeo,mats.helmet,[.29,.18,.30],[0,1.92,0]);
+ piece(root,cube,mats.visor,[.33,.055,.065],[0,1.87,.25]);
  const legs=[],arms=[];
  for(const side of [-1,1]){
-  const lg=new THREE.Group();lg.position.set(side*.17,.64,0);root.add(lg);
-  piece(lg,cube,mats.suit[0],[.22,.62,.26],[0,-.32,0]);
-  piece(lg,cube,mats.boots,[.25,.20,.36],[0,-.67,.07]);legs.push(lg);
-  const arm=new THREE.Group();arm.position.set(side*.39,1.49,0);root.add(arm);
-  arm.rotation.x=-.45;arm.rotation.z=side*.14;
-  piece(arm,cube,mats.suit[1],[.22,.63,.24],[0,-.32,0]);
-  // Clearly legible bright blue cloth on BOTH upper sleeves.
-  piece(arm,cube,mats.blue,[.255,.13,.279],[0,-.20,0]);
-  piece(arm,cube,mats.blueLight,[.258,.026,.281],[0,-.26,0]);
-  piece(arm,cube,mats.gloves,[.21,.16,.21],[0,-.69,0]);arms.push(arm);
+  const leg=new THREE.Group();leg.position.set(side*.17,.64,0);root.add(leg);
+  piece(leg,cube,mats.suit[0],[.23,.63,.27],[0,-.31,0]);
+  piece(leg,cube,mats.boots,[.25,.19,.37],[0,-.66,.07]);
+  legs.push(leg);
  }
- // Low-poly rifle, clearly held across chest.
- piece(root,cube,mats.gun,[.16,.16,.60],[.10,1.14,.40]);
- piece(root,cylinder,mats.gun,[.045,.40,.045],[.10,1.13,.83]).rotation.x=Math.PI/2;
- piece(root,cube,mats.webbing,[.15,.30,.15],[.1,.95,.27]);
- const muzzle=piece(root,sphere,new THREE.MeshBasicMaterial({color:0xffcf73}),[.16,.16,.16],[.10,1.13,1.13]);
+ const gun=new THREE.Group();gun.position.set(.04,1.38,.34);root.add(gun);
+ // Stock, receiver, wooden foregrip and barrel all run forward (+Z).
+ piece(gun,cube,mats.gun,[.19,.20,.45],[0,0,.01]);
+ piece(gun,cube,mats.helmet,[.21,.075,.29],[0,.12,.04]);
+ piece(gun,cube,mats.webbing,[.18,.13,.40],[0,-.02,.38]); // handguard
+ piece(gun,cube,mats.gun,[.11,.19,.40],[0,-.03,-.35]); // stock
+ piece(gun,cube,mats.gun,[.13,.24,.14],[0,-.23,.00]); // magazine
+ piece(gun,cube,mats.gloves,[.08,.14,.12],[0,-.17,-.12]); // trigger
+ piece(gun,cylinder,mats.gun,[.042,.66,.042],[0,.025,.72]).rotation.x=Math.PI/2;
+ piece(gun,cylinder,mats.helmet,[.065,.11,.065],[0,.025,1.075]).rotation.x=Math.PI/2;
+ piece(gun,cube,mats.gun,[.07,.09,.07],[0,.16,.26]); // rear sight
+ piece(gun,cube,mats.gun,[.07,.11,.07],[0,.16,.87]); // front sight
+ // Left hand clamps the front foregrip, right hand is on the trigger.
+ const handTargets=[
+  {side:-1,shoulder:[-.39,1.48,.015],elbow:[-.46,1.21,.37],hand:[-.11,1.34,.71]},
+  {side:1,shoulder:[.39,1.48,.015],elbow:[.44,1.23,.25],hand:[.13,1.29,.33]}
+ ];
+ for(const side of handTargets){
+  const arm=new THREE.Group();root.add(arm);
+  segment(arm,side.shoulder,side.elbow,.24,.26,mats.suit[1]);
+  segment(arm,side.elbow,side.hand,.20,.22,mats.suit[0]);
+  const wrist=piece(arm,cube,mats.gloves,[.21,.18,.21],side.hand);
+  // Blue bands wrap the upper sleeve, with a narrow bright edge.
+  const bandStart=interpolate(side.shoulder,side.elbow,.18);
+  const bandEnd=interpolate(side.shoulder,side.elbow,.46);
+  segment(arm,bandStart,bandEnd,.278,.296,mats.blue);
+  segment(arm,bandEnd,interpolate(side.shoulder,side.elbow,.52),.280,.302,mats.blueLight);
+  arms.push(arm);
+ }
+ const muzzle=piece(gun,sphere,new THREE.MeshBasicMaterial({color:0xffcf73}),[.15,.15,.20],[0,.025,1.18]);
  muzzle.visible=false;
- root.userData={legs,arms,muzzle,head,torso};
+ root.userData={legs,arms,muzzle,head,torso,gun};
  return root;
 }
 const between=(n,a,b)=>Math.max(a,Math.min(b,n));
@@ -106,7 +140,7 @@ export class EnemySystem {
   this.bots=configureSpawns(map);
   this.maxActive=matchMedia('(pointer:coarse)').matches?17:24;
   this.slots=Array.from({length:this.maxActive},()=>{const root=soldier();root.visible=false;scene.add(root);return{root,id:-1};});
-  this.active=[];this.frags=[];this.time=0;this.rebuildTime=0;this.kills=0;this.lastHit=null;
+  this.active=[];this.frags=[];this.coolant=new AntifreezeFX(scene,height,this.rng);this.time=0;this.rebuildTime=0;this.kills=0;this.lastHit=null;
   this.refresh({x:map.center.x,z:map.center.z});
  }
  refresh(player){
@@ -168,10 +202,11 @@ export class EnemySystem {
    for(let i=0;i<2;i++){
     const swing=moving?Math.sin(b.age*7+i*Math.PI)*.36:0;
     animation.legs[i].rotation.x=swing;
-    animation.arms[i].rotation.x=-.45-swing*.18;
+    animation.arms[i].rotation.x=swing*.045;
    }
    animation.muzzle.visible=b.shotFlash>0;
   }
+  this.coolant.tick(dt);
   for(let i=this.frags.length-1;i>=0;i--){
    const f=this.frags[i];f.age+=dt;f.vel.y-=14*dt;
    f.mesh.position.addScaledVector(f.vel,dt);
@@ -191,6 +226,7 @@ export class EnemySystem {
  hit(enemy,damage,shotDir,headshot=false){
   if(!enemy?.alive)return false;
   enemy.health-=damage;
+  this.coolant.burst(enemy.x,height(enemy.x,enemy.z)+(headshot?1.73:1.15),enemy.z,shotDir,enemy.health<=0?68:13,enemy.health<=0?1.35:.55);
   this.lastHit={x:enemy.x,z:enemy.z,time:this.time};
   if(enemy.health>0)return true;
   enemy.alive=false;this.kills++;
