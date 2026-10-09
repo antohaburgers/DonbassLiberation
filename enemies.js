@@ -131,7 +131,7 @@ function segmentHitsBuilding(ax,az,bx,bz,building,margin=.5){
  return hi>.025&&lo<.975;
 }
 function isClear(map,ax,az,bx,bz){
- for(const b of map.buildings)
+ for(const b of [...map.buildings,...(map.covers||[])])
   if(segmentHitsBuilding(ax,az,bx,bz,b))return false;
  return true;
 }
@@ -146,7 +146,7 @@ function configureSpawns(map){
     const angle=rng()*Math.PI*2,d=14+rng()*42;
     const x=p.x+Math.cos(angle)*d,z=p.z+Math.sin(angle)*d;
     if(Math.abs(x)>480||Math.abs(z)>480)continue;
-    if(map.buildings.some(b=>Math.abs(x-b.x)<b.w/2+3&&Math.abs(z-b.z)<b.d/2+3))continue;
+    if([...map.buildings,...(map.covers||[])].some(b=>Math.abs(x-b.x)<b.w/2+2&&Math.abs(z-b.z)<b.d/2+2))continue;
     if(bots.some(b=>Math.hypot(b.x-x,b.z-z)<3))continue;
     px=x;pz=z;break;
    }
@@ -316,10 +316,10 @@ export class EnemySystem {
   }
   if(!best)return null;
   // Occlusion by house/barn silhouettes, using 3-D ray-box slab test.
-  for(const b of this.map.buildings){
+  for(const b of [...this.map.buildings,...(this.map.covers||[])]){
    const yy=height(b.x,b.z);
    const boundaries=[[b.x-b.w/2,b.x+b.w/2,origin.x,rayD.x],
-    [yy-.2,yy+b.h+2.0,origin.y,rayD.y],
+    [yy-.2,yy+b.h+(b.cover?0:2),origin.y,rayD.y],
     [b.z-b.d/2,b.z+b.d/2,origin.z,rayD.z]];
    let near=0,far=best.distance,hit=true;
    for(const [lo,hi,coordinate,direction] of boundaries){
