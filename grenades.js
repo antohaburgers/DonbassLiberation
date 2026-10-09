@@ -6,10 +6,11 @@ const cap=new THREE.MeshLambertMaterial({color:0x303b37});
 const flashMaterial=new THREE.MeshBasicMaterial({color:0xffd27d,transparent:true,opacity:.85,depthWrite:false});
 const sphere=new THREE.IcosahedronGeometry(1,1);
 const casing=new THREE.CylinderGeometry(.14,.14,.36,9);
+const lidGeometry=new THREE.BoxGeometry(.22,.07,.22);
 function grenadeModel(){
  const root=new THREE.Group();
  const body=new THREE.Mesh(casing,shell);root.add(body);
- const lid=new THREE.Mesh(new THREE.BoxGeometry(.22,.07,.22),cap);
+ const lid=new THREE.Mesh(lidGeometry,cap);
  lid.position.y=.2;root.add(lid);return root;
 }
 export class GrenadeSystem{
@@ -29,7 +30,6 @@ export class GrenadeSystem{
  explode(item,player){
   const at=item.mesh.position.clone();
   this.scene.remove(item.mesh);
-  item.mesh.children.forEach(x=>x.geometry.dispose());
   const blast=new THREE.Mesh(new THREE.IcosahedronGeometry(1,1),flashMaterial.clone());
   blast.position.copy(at);this.scene.add(blast);this.blasts.push({mesh:blast,age:0});
   let knocked=0;
