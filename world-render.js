@@ -228,6 +228,8 @@ export class WorldView{
    root.position.set(poi.x,height(poi.x,poi.z),poi.z);scene.add(root);
    this.markers.push({poi,root,ring,flag});
   }
+  this.cx=Math.floor((map.center.x+500)/125);
+  this.cz=Math.floor((map.center.z+500)/125);
   this.rebuild(map.center.x,map.center.z);
  }
  chunk(cx,cz){
@@ -237,7 +239,8 @@ export class WorldView{
   const positions=geo.getAttribute('position'),colors=[];
   for(let i=0;i<positions.count;i++){
    const x=ox+positions.getX(i),z=oz+positions.getZ(i);
-   positions.setY(i,height(x,z));
+   // World-space vertices: without X/Z offsets every terrain tile overlaps at origin.
+   positions.setXYZ(i,x,height(x,z),z);
    // Broad biome mottling in continuous world coordinates avoids tile seams.
    const hash=(ix,iz)=>rand(ix+this.map.seed%10007,iz+Math.floor(this.map.seed/10007));
    const noise=(size)=>{
