@@ -1,5 +1,5 @@
 // PWA registration and explicit safe updates. Game state stays in memory.
-const APP_VERSION='0.7';
+const APP_VERSION='0.8';
 const scope=new URL('./',location.href).href;
 const button=document.getElementById('refresh-game');
 const status=document.getElementById('update-status');
@@ -55,7 +55,7 @@ button?.addEventListener('click',async()=>{
   const response=await fetch(test,{cache:'no-store'});
   if(!response.ok)throw new Error('СТРАНИЦА ЕЩЁ НЕ ОПУБЛИКОВАНА: '+response.status);
   const page=await response.text();
-  if(!page.includes('id="refresh-game"')||!page.includes('game.js?v=07'))
+  if(!page.includes('id="refresh-game"')||!page.includes('game.js?v=08'))
     throw new Error('НОВАЯ ВЕРСИЯ ЕЩЁ НЕ ОПУБЛИКОВАНА');
   setStatus('ОБНОВЛЯЮ ФАЙЛЫ…');
   if('serviceWorker' in navigator){
