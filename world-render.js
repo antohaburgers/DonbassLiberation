@@ -1,5 +1,5 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js';
-import {height,treesForChunk,randomizer} from './world-data.js';
+import {height,treesForChunk,randomizer} from './world-data.js?v=02';
 
 // Visual direction adapted from DerevnyaRally: natural palette, patterned dirt,
 // village rooflines, layered forest, dense grass, fog and soft afternoon light.
