@@ -1,5 +1,5 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js';
-import {height,randomizer} from './world-data.js?v=02';
+import {height,randomizer} from './world-data.js?v=08';
 import {AntifreezeFX} from './antifreeze.js?v=06';
 
 
