@@ -20,7 +20,7 @@ function surface(map){
    const dx=b.x-a.x,dz=b.z-a.z,dist=Math.hypot(dx,dz)||1,nx=-dz/dist,nz=dx/dist,w=road.width/2;
    for(const sign of [-1,1]){
     const x=p.x+nx*w*sign,z=p.z+nz*w*sign;
-    positions.push(x,height(x,z)+.28,z);
+    positions.push(x,height(x,z)+.065,z);
    }
    if(i){const j=i*2;indices.push(j-2,j-1,j,j-1,j+1,j);}
   }
@@ -62,7 +62,7 @@ export class WorldView{
    root.position.set(p.x,height(p.x,p.z),p.z);scene.add(root);
    this.markers.push({poi:p,root,ring,pole});
   }
-  this.rebuild(-440,-440);
+  this.rebuild(map.center.x,map.center.z);
  }
  chunk(cx,cz){
   const node=new THREE.Group(),ox=-500+(cx+.5)*125,oz=-500+(cz+.5)*125;
