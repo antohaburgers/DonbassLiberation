@@ -52,14 +52,40 @@ export function generate(seed){
    });
   }
  }
- return {seed,pois,roads,buildings,center};
+ const covers=[];
+ const blueprints={
+  village:[['hay',4],['fence',4]],
+  checkpoint:[['barrier',7],['sandbag',4]],
+  base:[['barrier',7],['sandbag',5],['crate',4]],
+  depot:[['container',3],['crate',9]],
+  camp:[['log',7],['sandbag',3]]
+ };
+ for(const p of pois){
+  const type=p.type,plan=blueprints[type]||blueprints.village;
+  for(const [kind,n] of plan)for(let i=0;i<n;i++){
+   for(let attempts=0;attempts<50;attempts++){
+    const a=rng()*Math.PI*2,r=type==='camp'?11+rng()*36:17+rng()*37;
+    const x=p.x+Math.cos(a)*r,z=p.z+Math.sin(a)*r;
+    const w=kind==='container'?7:kind==='fence'?4.4:kind==='log'?4.6:kind==='crate'?1.8:kind==='hay'?2.3:kind==='barrier'?3.4:3.8;
+    const d=kind==='container'?2.7:kind==='fence'?.25:kind==='log'?.8:kind==='crate'?1.8:kind==='hay'?1.6:kind==='barrier'?.7:1.0;
+    const h=kind==='container'?3.1:kind==='fence'?1.25:kind==='log'?.65:kind==='crate'?1.45:kind==='hay'?1.2:kind==='barrier'?1.25:.9;
+    if(Math.abs(x)>480||Math.abs(z)>480)continue;
+    if(buildings.some(b=>Math.abs(x-b.x)<(w+b.w)/2+2&&Math.abs(z-b.z)<(d+b.d)/2+2))continue;
+    if(covers.some(c=>Math.hypot(c.x-x,c.z-z)<Math.max(w,c.w)*.75+1))continue;
+    covers.push({x,z,w,d,h,kind,cover:true,poi:p.id,angle:Math.round(a*4)/4});
+    break;
+   }
+  }
+ }
+ return {seed,pois,roads,buildings,covers,center};
 }
 export function treesForChunk(cx,cz,map){
  const rng=randomizer((map.seed^Math.imul(cx+11,73856093)^Math.imul(cz+17,19349663))>>>0);
  const trees=[];
  for(let i=0;i<148;i++){
   const x=-500+(cx+rng())*125,z=-500+(cz+rng())*125;
-  const nearPoi=map.pois.some(p=>Math.hypot(p.x-x,p.z-z)<(p.type==='village'?75:63));
+  const nearPoi=map.pois.some(p=>Math.hypot(p.x-x,p.z-z)<
+   (p.type==='village'?75:p.type==='camp'?19:63));
   const byRoad=roadDistance(x,z,map.roads)<11;
   const field= Math.sin(x*.017+map.seed*.00001)+Math.cos(z*.019);
   const density=field>.4?.84:field<-.8?.13:.42;
