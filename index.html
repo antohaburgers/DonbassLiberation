@@ -2,11 +2,18 @@
 <html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#17221e">
-<title>ДОНБАСС — Операция освобождение 0.6</title>
-<link rel="stylesheet" href="./style.css?v=05"></head>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ДОНБАСС">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="./manifest.webmanifest?v=07">
+<link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png?v=07">
+<link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png?v=07">
+<title>ДОНБАСС — Операция освобождение 0.7</title>
+<link rel="stylesheet" href="./style.css?v=07"></head>
 <body>
 <canvas id="screen"></canvas><div id="shade"></div><div id="crosshair">+</div>
-<div id="hud"><div id="brand">ДОНБАСС <small>ОПЕРАЦИЯ ОСВОБОЖДЕНИЕ • БОЕВАЯ АЛЬФА 0.6</small></div>
+<div id="hud"><div id="brand">ДОНБАСС <small>ОПЕРАЦИЯ ОСВОБОЖДЕНИЕ • БОЕВАЯ АЛЬФА 0.7</small></div>
 <div id="stats"><strong id="scouted">0 / 6</strong><small>ЗАХВАЧЕНО ТОЧЕК</small></div>
 <div id="direction"><b id="compass">С</b><small id="target">ИЩЕМ ОБЪЕКТЫ</small><small id="fps">FPS —</small></div>
 <div id="mapbox"><canvas id="minimap" width="240" height="240"></canvas><small>КАРТА 1 × 1 КМ</small></div>
@@ -17,14 +24,22 @@
 <div id="stick"><div id="nub"></div></div>
 <div id="actions"><button id="runBtn">БЕГ</button><button id="jumpBtn">ПРЫЖОК</button><button id="reloadBtn">ПЕРЕЗ.</button><button id="fireBtn">ОГОНЬ</button></div>
 <div id="menu"><div class="menu-card">
-<div class="eyebrow">ПРОЦЕДУРНЫЙ FPS • АЛЬФА 0.6</div>
+<div class="eyebrow">ПРОЦЕДУРНЫЙ FPS • АЛЬФА 0.7</div>
 <h1>ДОНБАСС</h1><h2>ОПЕРАЦИЯ ОСВОБОЖДЕНИЕ</h2>
 <p>Ты один против толпы роботов в военной форме. Зачищай деревни, базы и блокпосты, захватывай шесть точек. Автомат, вражеские патрули, звук стрельбы и красные брызги антифриза.</p>
 <div class="chips"><span>1 КМ²</span><span>6 ОБЪЕКТОВ</span><span>СЛУЧАЙНАЯ КАРТА</span><span>76 РОБОТОВ</span><span>ГЕЙМПАД</span></div>
 <button id="play">НАЧАТЬ ОПЕРАЦИЮ</button><button id="newMap" class="secondary">ДРУГАЯ КАРТА</button>
 <small>ПК: WASD, мышь, ЛКМ — огонь, R — перезарядка, Shift — бег, Space — прыжок. Телефон: стик, свайп, кнопки ОГОНЬ и ПЕРЕЗ. Геймпад: RT — огонь, X — перезарядка, A — прыжок.</small>
+<div class="pwa-section">
+ <button id="refresh-game" class="secondary">ПРОВЕРИТЬ ОБНОВЛЕНИЯ</button>
+ <button id="install-game" class="secondary" hidden>УСТАНОВИТЬ ИГРУ</button>
+ <span id="update-status">ВЕРСИЯ 0.7</span>
+ <small id="install-hint">iPhone: Safari → Поделиться → На экран «Домой».</small>
+</div>
 </div></div>
 <div id="rotate"><span>↻</span> Поверни телефон горизонтально</div>
 <div id="error"></div>
-<script type="module" src="./game.js?v=06"></script>
+<script src="./browser-guard.js?v=07" defer></script>
+<script src="./pwa.js?v=07" defer></script>
+<script type="module" src="./game.js?v=07"></script>
 </body></html>
