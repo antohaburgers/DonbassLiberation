@@ -1,5 +1,5 @@
-// DonbassLiberation v0.7 — GitHub Pages / static PWA.
-const VERSION='0.7.0';
+// DonbassLiberation v0.8 — GitHub Pages / static PWA.
+const VERSION='0.8.0';
 const ROOT=new URL('./',self.location.href);
 const PREFIX='donbass-liberation:'+self.registration.scope+':';
 const CACHE=PREFIX+VERSION;
@@ -7,17 +7,19 @@ const SHELL=new URL('./index.html',ROOT).href;
 const THREE_CDN='https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js';
 const CORE=[
  './index.html',
- './style.css?v=07',
- './game.js?v=07',
- './input.js?v=05',
- './world-data.js?v=02',
- './world-render.js?v=04',
+ './style.css?v=08',
+ './game.js?v=08',
+ './input.js?v=08',
+ './world-data.js?v=08',
+ './world-render.js?v=08',
  './weapon.js?v=05',
- './enemies.js?v=06',
+ './enemies.js?v=08',
  './antifreeze.js?v=06',
- './combat-audio.js?v=05',
+ './combat-audio.js?v=08',
+ './supplies.js?v=08',
+ './grenades.js?v=08',
  './browser-guard.js?v=07',
- './pwa.js?v=07',
+ './pwa.js?v=08',
  './manifest.webmanifest',
  './icons/icon-192.png',
  './icons/icon-512.png',
