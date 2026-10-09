@@ -34,3 +34,7 @@
 - game.js — состояние игры и цикл кадров
 
 **Основа дизайна** — идеи из проекта DerevnyaRally, но код 3D-карты написан отдельно для квадратного мира вместо бесконечной дорожной ленты.
+
+## Version 0.5
+
+Prototype now includes first-person rifle, camera-attached weapon animation, 76 simple NPCs with blue armbands, sound effects, health, ammo, reload, and control point gameplay. Controls: hold left mouse button / FIRE touch button / gamepad RT. Reload with R / touch RELOAD / gamepad X.
