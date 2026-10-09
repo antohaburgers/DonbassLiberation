@@ -29,12 +29,21 @@ function painted(kind){
  // Persistent, repeating procedural albedo; broad detail is visible from eye height.
  const cvs=document.createElement('canvas');cvs.width=cvs.height=512;
  const ctx=cvs.getContext('2d'),pixels=ctx.createImageData(512,512);
- // Interpolated, tileable value noise prevents hard pixelated squares and seams.
+ // Tileable noise grids are precomputed once, keeping iPhone startup fast.
+ const tables=new Map();
+ for(const frequency of [5,21,83]){
+  const data=new Float32Array(frequency*frequency);
+  for(let j=0;j<frequency;j++)for(let i=0;i<frequency;i++)
+   data[i+j*frequency]=rand(i+31*frequency,j+73*frequency);
+  tables.set(frequency,data);
+ }
  function smoothNoise(x,y,frequency){
   const fx=x/512*frequency,fy=y/512*frequency,ix=Math.floor(fx),iy=Math.floor(fy);
-  const a=fx-ix,b=fy-iy,u=a*a*(3-2*a),v=b*b*(3-2*b),wrap=n=>(n%frequency+frequency)%frequency;
-  const s=(xx,yy)=>rand(wrap(xx)+31*frequency,wrap(yy)+73*frequency);
-  const ab=s(ix,iy)*(1-u)+s(ix+1,iy)*u,cd=s(ix,iy+1)*(1-u)+s(ix+1,iy+1)*u;
+  const a=fx-ix,b=fy-iy,u=a*a*(3-2*a),v=b*b*(3-2*b);
+  const data=tables.get(frequency);
+  const x0=ix%frequency,x1=(ix+1)%frequency,y0=iy%frequency,y1=(iy+1)%frequency;
+  const ab=data[x0+y0*frequency]*(1-u)+data[x1+y0*frequency]*u;
+  const cd=data[x0+y1*frequency]*(1-u)+data[x1+y1*frequency]*u;
   return ab*(1-v)+cd*v;
  }
  for(let y=0;y<512;y++)for(let x=0;x<512;x++){
