@@ -1,5 +1,5 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js';
-import {height,randomizer} from './world-data.js?v=02';
+import {height,randomizer} from './world-data.js?v=08';
 
 const BROWN=new THREE.MeshLambertMaterial({color:0x88724d});
 const EDGE=new THREE.MeshLambertMaterial({color:0x544936});
