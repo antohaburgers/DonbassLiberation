@@ -1,5 +1,5 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js';
-import {height} from './world-data.js?v=02';
+import {height} from './world-data.js?v=08';
 
 const shell=new THREE.MeshLambertMaterial({color:0x48574b,metalness:0.2});
 const cap=new THREE.MeshLambertMaterial({color:0x303b37});
