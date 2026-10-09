@@ -10,7 +10,7 @@ const player={x:0,z:0,yaw:0,pitch:0,jumpY:0,vy:0};
 let frameTime=performance.now(),elapsed=0,hudTime=0,fpsSmooth=60,toastTime=0,map;
 function init(){
  map=generate(seed);
- renderer=new THREE.WebGLRenderer({canvas:$('screen'),antialias:false,powerPreference:'high-performance'});
+ renderer=new THREE.WebGLRenderer({canvas:$('screen'),antialias:true,powerPreference:'high-performance'});
  renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.6));
  renderer.setSize(innerWidth,innerHeight);
  renderer.outputColorSpace=THREE.SRGBColorSpace;
@@ -22,7 +22,7 @@ function init(){
  const sun=new THREE.DirectionalLight(0xffefc8,2.4);sun.position.set(-90,155,70);scene.add(sun);
  camera=new THREE.PerspectiveCamera(76,innerWidth/innerHeight,.08,440);
  camera.rotation.order='YXZ';
- player.x=map.center.x;player.z=map.center.z;
+ const entry=map.roads[5].points[26];player.x=entry.x;player.z=entry.z;
  const first=map.pois[5];player.yaw=Math.atan2(-(first.x-player.x),-(first.z-player.z));
  world=new WorldView(scene,map);
  controls=createInput($('screen'));
