@@ -58,7 +58,7 @@ export class SupplySystem{
     for(let t=0;t<40;t++){
      const angle=rng()*Math.PI*2,radius=12+rng()*28;
      const px=poi.x+Math.cos(angle)*radius,pz=poi.z+Math.sin(angle)*radius;
-     const bad=map.buildings.some(b=>Math.abs(px-b.x)<b.w/2+3&&Math.abs(pz-b.z)<b.d/2+3);
+     const bad=[...map.buildings,...(map.covers||[])].some(b=>Math.abs(px-b.x)<b.w/2+3&&Math.abs(pz-b.z)<b.d/2+3);
      const duplicate=this.crates.some(c=>Math.hypot(c.x-px,c.z-pz)<7);
      if(!bad&&!duplicate&&Math.abs(px)<487&&Math.abs(pz)<487){x=px;z=pz;break;}
     }
@@ -77,7 +77,6 @@ export class SupplySystem{
     const taken=apply(box.type);
     if(taken){
      box.picked=true;this.scene.remove(box.mesh);
-     box.mesh.traverse?.(o=>{if(o.geometry&&o.geometry!==crate.prototype)o.geometry.dispose?.();});
      continue;
     }
    }
