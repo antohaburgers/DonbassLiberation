@@ -1,7 +1,7 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js';
-import {generate,height,clamp} from './world-data.js';
-import {WorldView} from './world-render.js';
-import {createInput} from './input.js';
+import {generate,height,clamp} from './world-data.js?v=02';
+import {WorldView} from './world-render.js?v=02';
+import {createInput} from './input.js?v=02';
 const $=id=>document.getElementById(id);
 const seedParam=new URLSearchParams(location.search).get('seed');
 const seed=seedParam&&/^\d+$/.test(seedParam)?Number(seedParam)>>>0:Math.floor(Math.random()*4294967295);
