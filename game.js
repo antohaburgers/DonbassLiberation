@@ -1,18 +1,46 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js';
-import {generate,height,clamp} from './world-data.js?v=02';
+import {generate,height,clamp,randomizer} from './world-data.js?v=02';
 import {WorldView} from './world-render.js?v=04';
-import {createInput} from './input.js?v=02';
+import {createInput} from './input.js?v=05';
+import {FirstPersonWeapon} from './weapon.js?v=05';
+import {EnemySystem} from './enemies.js?v=05';
+import {CombatAudio} from './combat-audio.js?v=05';
+
 const $=id=>document.getElementById(id);
 const seedParam=new URLSearchParams(location.search).get('seed');
 const seed=seedParam&&/^\d+$/.test(seedParam)?Number(seedParam)>>>0:Math.floor(Math.random()*4294967295);
-let world,scene,camera,renderer,controls,running=false;
-const player={x:0,z:0,yaw:0,pitch:0,jumpY:0,vy:0};
-let frameTime=performance.now(),elapsed=0,hudTime=0,fpsSmooth=60,toastTime=0,map;
+const rand=randomizer(seed^0x8d1fa3);
+let world,scene,camera,renderer,controls,enemies,gun,audio,running=false;
+const player={x:0,z:0,yaw:0,pitch:0,jumpY:0,vy:0,hp:100,dead:false,respawnTime:0};
+const ammo={mag:30,reserve:540,maxMag:30,cooldown:0,reloadTime:0,reloadLength:1.6};
+let frameTime=performance.now(),elapsed=0,hudTime=0,fpsSmooth=60,toastTime=0,map,flashHit=0,flashDamage=0,gameWon=false;
+const vForward=new THREE.Vector3(),vRight=new THREE.Vector3(),vUp=new THREE.Vector3(),fireRay=new THREE.Vector3();
+
+function showToast(message){
+ $('toast').textContent=message;$('toast').classList.add('show');toastTime=2.8;
+}
+function enemyShot(enemy,hit,dist){
+ if(!running||player.dead)return;
+ audio.enemy(dist);
+ if(hit){
+  player.hp=Math.max(0,player.hp-7);
+  flashDamage=Math.min(.72,flashDamage+.25);
+  audio.hurt();
+  if(player.hp<=0){
+   player.dead=true;player.respawnTime=2.6;
+   controls.clearFire();
+   showToast('БОЕЦ ВЫБЫЛ • ВОЗРОЖДЕНИЕ');
+  }
+ }
+}
+function onKill(enemy,headshot){
+ flashHit=.17;
+ if(headshot)showToast('ТОЧНО В ГОЛОВУ');
+}
 function init(){
  map=generate(seed);
  renderer=new THREE.WebGLRenderer({canvas:$('screen'),antialias:true,powerPreference:'high-performance'});
- renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.6));
- renderer.setSize(innerWidth,innerHeight);
+ renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.6));renderer.setSize(innerWidth,innerHeight);
  renderer.outputColorSpace=THREE.SRGBColorSpace;
  renderer.toneMapping=THREE.ACESFilmicToneMapping;
  renderer.toneMappingExposure=1.18;
@@ -21,53 +49,123 @@ function init(){
  scene.add(new THREE.HemisphereLight(0xe6f2e9,0x4b5745,2.25));
  const sun=new THREE.DirectionalLight(0xffefc8,2.4);sun.position.set(-90,155,70);scene.add(sun);
  camera=new THREE.PerspectiveCamera(76,innerWidth/innerHeight,.08,440);
- camera.rotation.order='YXZ';
+ camera.rotation.order='YXZ';scene.add(camera);
  const entry=map.roads[5].points[26];player.x=entry.x;player.z=entry.z;
  const first=map.pois[5];player.yaw=Math.atan2(-(first.x-player.x),-(first.z-player.z));
- world=new WorldView(scene,map);
- controls=createInput($('screen'));
+ world=new WorldView(scene,map);controls=createInput($('screen'));
+ gun=new FirstPersonWeapon(camera);
+ audio=new CombatAudio();
+ enemies=new EnemySystem(scene,map,world,enemyShot,onKill);
  addEventListener('resize',resize);
- $('play').addEventListener('click',()=>{running=true;$('menu').classList.add('hidden');$('play').textContent='ПРОДОЛЖИТЬ';showToast('РАЗВЕДАЙ 6 ОБЪЕКТОВ');});
- $('menuBtn').addEventListener('click',()=>{running=false;$('menu').classList.remove('hidden');document.exitPointerLock?.();});
+ $('play').addEventListener('click',()=>{
+  audio.unlock();running=true;$('menu').classList.add('hidden');
+  $('play').textContent='ПРОДОЛЖИТЬ';
+  showToast(gameWon?'ВСЕ ТОЧКИ ЗАХВАЧЕНЫ':'ЗАЧИСТИ ОБЪЕКТЫ И ЗАХВАТИ ТОЧКИ');
+ });
+ $('menuBtn').addEventListener('click',openMenu);
+ $('soundBtn').addEventListener('click',()=>{
+  audio.unlock();const muted=audio.toggle();$('soundBtn').textContent=muted?'🔇':'🔊';
+ });
  $('newMap').addEventListener('click',()=>{location.search='?seed='+Math.floor(Math.random()*4294967295);});
- addEventListener('keydown',e=>{if(e.code==='Escape'&&running){running=false;$('menu').classList.remove('hidden');}});
+ addEventListener('keydown',e=>{if(e.code==='Escape'&&running)openMenu();});
  updateCamera();drawMap();requestAnimationFrame(loop);
+}
+function openMenu(){
+ running=false;controls.clearFire();document.exitPointerLock?.();
+ $('menu').classList.remove('hidden');
 }
 function resize(){
  renderer.setSize(innerWidth,innerHeight);
  renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.6));
  camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
 }
-function showToast(text){$('toast').textContent=text;$('toast').classList.add('show');toastTime=2.8;}
 function updateCamera(){
  camera.position.set(player.x,height(player.x,player.z)+1.74+player.jumpY,player.z);
  camera.rotation.set(player.pitch,player.yaw,0,'YXZ');
 }
-function movement(dt){
- const input=controls.frame(dt);
+function movement(dt,input){
  player.yaw+=input.dyaw;player.pitch=clamp(player.pitch+input.dpitch,-1.44,1.44);
- let speed=input.sprint?9.5:5.3;
+ const speed=input.sprint?9.5:5.3;
  const dx=(input.strafe*Math.cos(player.yaw)-input.forward*Math.sin(player.yaw))*speed*dt;
  const dz=(-input.strafe*Math.sin(player.yaw)-input.forward*Math.cos(player.yaw))*speed*dt;
  const nx=clamp(player.x+dx,-488,488),nz=clamp(player.z+dz,-488,488);
  if(!world.blocked(nx,player.z))player.x=nx;
  if(!world.blocked(player.x,nz))player.z=nz;
- if(input.jump&&player.jumpY<=.005){player.vy=6.7;}
- if(player.vy||player.jumpY){player.jumpY+=player.vy*dt;player.vy-=18*dt;if(player.jumpY<=0){player.jumpY=0;player.vy=0;}}
+ if(input.jump&&player.jumpY<=.005)player.vy=6.7;
+ if(player.vy||player.jumpY){
+  player.jumpY+=player.vy*dt;player.vy-=18*dt;
+  if(player.jumpY<=0){player.jumpY=0;player.vy=0;}
+ }
+}
+function startReload(){
+ if(ammo.reloadTime>0||ammo.mag===ammo.maxMag||ammo.reserve<=0||player.dead)return;
+ ammo.reloadTime=ammo.reloadLength;gun.reload(ammo.reloadLength);audio.reload();
+ $('reloadStatus').textContent='ПЕРЕЗАРЯДКА...';
+}
+function finishReload(){
+ const add=Math.min(ammo.maxMag-ammo.mag,ammo.reserve);
+ ammo.mag+=add;ammo.reserve-=add;$('reloadStatus').textContent='АВТОМАТИЧЕСКИЙ ОГОНЬ';
+}
+function shoot(){
+ if(ammo.cooldown>0||ammo.reloadTime>0||player.dead)return;
+ if(ammo.mag<=0){startReload();return;}
+ ammo.mag--;ammo.cooldown=.107;
+ gun.shot();audio.shoot();
+ camera.updateMatrixWorld(true);
+ camera.getWorldDirection(vForward);vRight.set(1,0,0).applyQuaternion(camera.quaternion);
+ vUp.set(0,1,0).applyQuaternion(camera.quaternion);
+ const spread=.0065;
+ fireRay.copy(vForward).addScaledVector(vRight,(rand()-.5)*spread)
+  .addScaledVector(vUp,(rand()-.5)*spread).normalize();
+ const result=enemies.raycast(camera.position,fireRay,172);
+ if(result){
+  const damage=result.headshot?110:36;
+  enemies.hit(result.enemy,damage,fireRay,result.headshot);
+  flashHit=.12;audio.hit();
+ }
+ if(ammo.mag<=0&&ammo.reserve>0)startReload();
+}
+function updateCombat(dt,input){
+ ammo.cooldown=Math.max(0,ammo.cooldown-dt);
+ if(ammo.reloadTime>0){
+  ammo.reloadTime-=dt;
+  if(ammo.reloadTime<=0){ammo.reloadTime=0;finishReload();}
+ }
+ if(input.reload)startReload();
+ if(input.fire)shoot();
+ const moving=Math.abs(input.forward)+Math.abs(input.strafe)>.02;
+ gun.update(dt,moving,input.sprint,input.dyaw);
+}
+function capture(){
  for(const poi of map.pois){
-  if(!poi.scouted&&Math.hypot(poi.x-player.x,poi.z-player.z)<18){
-   poi.scouted=true;const n=map.pois.filter(p=>p.scouted).length;
-   showToast('ОБЪЕКТ РАЗВЕДАН: '+poi.name+'  •  '+n+'/6');
-   if(n===6)setTimeout(()=>showToast('РАЗВЕДКА ЗАВЕРШЕНА!'),1700);
+  if(poi.scouted)continue;
+  const distance=Math.hypot(poi.x-player.x,poi.z-player.z);
+  if(distance<52&&enemies.atPoiRemaining(poi.id)===0){
+   poi.scouted=true;player.hp=Math.min(100,player.hp+20);
+   ammo.reserve+=90;
+   const count=map.pois.filter(p=>p.scouted).length;
+   showToast('ТОЧКА ЗАХВАЧЕНА: '+poi.name+' • '+count+'/6  +90 ПАТРОНОВ');
   }
  }
+ if(!gameWon&&map.pois.every(p=>p.scouted)){
+  gameWon=true;showToast('ОПЕРАЦИЯ ЗАВЕРШЕНА! ВСЕ 6 ТОЧЕК ЗАХВАЧЕНЫ');
+ }
+}
+function respawn(){
+ player.dead=false;player.hp=100;player.jumpY=0;player.vy=0;
+ ammo.mag=30;ammo.reserve=Math.max(180,ammo.reserve);ammo.reloadTime=0;
+ const entry=map.roads[5].points[26];
+ player.x=entry.x;player.z=entry.z;flashDamage=0;showToast('БОЕЦ ВЕРНУЛСЯ В СТРОЙ');
 }
 function drawMap(){
  const cvs=$('minimap'),ctx=cvs.getContext('2d'),w=cvs.width;
  ctx.clearRect(0,0,w,w);ctx.fillStyle='#546849';ctx.fillRect(0,0,w,w);
  const pos=(x,z)=>[(x+500)*w/1000,(z+500)*w/1000];
  ctx.globalAlpha=.13;ctx.fillStyle='#c2c18c';
- for(let i=0;i<90;i++){const x=((i*103+seed%200)%1000)*w/1000,z=((i*217+seed%300)%1000)*w/1000;ctx.fillRect(x,z,11,6);}
+ for(let i=0;i<90;i++){
+  const x=((i*103+seed%200)%1000)*w/1000,z=((i*217+seed%300)%1000)*w/1000;
+  ctx.fillRect(x,z,11,6);
+ }
  ctx.globalAlpha=1;
  for(const road of map.roads){
   ctx.strokeStyle=road.secondary?'#c5ab7d':'#d9d4ae';ctx.lineWidth=road.secondary?1.5:2.7;
@@ -79,6 +177,12 @@ function drawMap(){
   ctx.fillRect(x-4,y-4,8,8);ctx.strokeRect(x-4,y-4,8,8);
   ctx.font='bold 11px Arial';ctx.fillStyle='#ffffff';ctx.fillText(String.fromCharCode(65+poi.id),x+6,y-4);
  }
+ // Near enemies are shown as small red threats, further ones stay hidden.
+ for(const enemy of enemies.visiblePositions()){
+  if(Math.hypot(enemy.x-player.x,enemy.z-player.z)>120)continue;
+  const [x,y]=pos(enemy.x,enemy.z);ctx.fillStyle='#f05d4b';
+  ctx.beginPath();ctx.arc(x,y,2.4,0,6.28);ctx.fill();
+ }
  const [px,py]=pos(player.x,player.z);
  ctx.save();ctx.translate(px,py);ctx.rotate(-player.yaw);
  ctx.beginPath();ctx.moveTo(0,-9);ctx.lineTo(6,7);ctx.lineTo(0,4);ctx.lineTo(-6,7);ctx.closePath();
@@ -86,23 +190,38 @@ function drawMap(){
  ctx.strokeStyle='#e5e5d0';ctx.lineWidth=2;ctx.strokeRect(1,1,w-2,w-2);
 }
 function updateHud(){
- const count=map.pois.filter(p=>p.scouted).length;$('scouted').textContent=count+' / 6';
+ $('scouted').textContent=map.pois.filter(p=>p.scouted).length+' / 6';
  const degrees=((player.yaw*180/Math.PI)%360+360)%360;
  const compass=['С','СЗ','З','ЮЗ','Ю','ЮВ','В','СВ'];
  $('compass').textContent=compass[Math.round(degrees/45)%8];
  const next=map.pois.filter(p=>!p.scouted).sort((a,b)=>Math.hypot(a.x-player.x,a.z-player.z)-Math.hypot(b.x-player.x,b.z-player.z))[0];
- $('target').textContent=next?next.name+' • '+Math.round(Math.hypot(next.x-player.x,next.z-player.z))+' М':'ВСЕ ОБЪЕКТЫ РАЗВЕДАНЫ';
+ $('target').textContent=next?next.name+' · '+Math.round(Math.hypot(next.x-player.x,next.z-player.z))+' М':'ВСЕ ОБЪЕКТЫ ЗАХВАЧЕНЫ';
  $('fps').textContent='FPS '+Math.round(fpsSmooth);
+ $('health').textContent=player.hp;$('healthFill').style.width=player.hp+'%';
+ $('ammo').innerHTML=ammo.mag+' <i>/ '+ammo.reserve+'</i>';
+ $('kills').textContent='УСТРАНЕНО: '+enemies.kills+' / '+enemies.bots.length;
  drawMap();
 }
 function loop(now){
  requestAnimationFrame(loop);
  const dt=Math.min(.05,Math.max(.001,(now-frameTime)/1000));frameTime=now;elapsed+=dt;
  fpsSmooth=fpsSmooth*.92+(1/dt)*.08;
- if(running)movement(dt);
+ if(running){
+  if(player.dead){
+   player.respawnTime-=dt;if(player.respawnTime<=0)respawn();
+  }else{
+   const input=controls.frame(dt);
+   movement(dt,input);updateCamera();updateCombat(dt,input);
+   enemies.update(dt,player);capture();
+  }
+ }else{
+  gun.update(dt,false,false);
+ }
  world.update(player.x,player.z,dt,elapsed);
  updateCamera();
  if(toastTime>0){toastTime-=dt;if(toastTime<=0)$('toast').classList.remove('show');}
+ flashHit=Math.max(0,flashHit-dt);$('hitmarker').classList.toggle('visible',flashHit>0);
+ flashDamage=Math.max(0,flashDamage-dt*.85);$('damageFlash').style.opacity=flashDamage.toFixed(2);
  hudTime+=dt;if(hudTime>.13){hudTime=0;updateHud();}
  renderer.render(scene,camera);
 }
