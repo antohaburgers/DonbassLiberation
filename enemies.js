@@ -2,6 +2,23 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.m
 import {height,randomizer} from './world-data.js?v=02';
 import {AntifreezeFX} from './antifreeze.js?v=06';
 
+
+// Arcade factions: role changes both behavior and silhouette, never real-world uniforms.
+export const ROBOT_CLASSES={
+ rifle:{label:'СТРЕЛОК',health:100,speed:1.45,damage:7,range:60,hit:.18,cooldown:1.65,model:1},
+ scout:{label:'ШТУРМОВИК',health:65,speed:3.45,damage:5,range:38,hit:.12,cooldown:1.1,model:.92},
+ heavy:{label:'БРОНЕРОБОТ',health:255,speed:.82,damage:10,range:58,hit:.17,cooldown:2.7,model:1.19},
+ gunner:{label:'ПУЛЕМЁТЧИК',health:150,speed:.75,damage:4,range:76,hit:.09,cooldown:.55,model:1.1}
+};
+const POI_GARRISONS=[
+ ['rifle','scout','rifle','rifle','gunner','scout','rifle','rifle','scout','rifle','heavy','rifle'],
+ ['gunner','rifle','gunner','scout','rifle','heavy','rifle','gunner','rifle','scout','gunner','rifle'],
+ ['heavy','rifle','gunner','heavy','rifle','gunner','rifle','heavy','scout','rifle','gunner','heavy','scout','gunner','rifle'],
+ ['rifle','heavy','scout','gunner','rifle','rifle','scout','rifle','gunner','heavy','rifle','rifle','rifle'],
+ ['scout','rifle','scout','scout','rifle','scout','scout','rifle','scout','scout','rifle'],
+ ['rifle','scout','rifle','scout','rifle','heavy','rifle','rifle','gunner','scout','rifle','rifle','rifle']
+];
+
 // Simple, deliberately inaccurate bots and playful Niva-style flying body parts.
 // No real-world unit insignia: olive field uniform with bright blue arm bands.
 const material=(hex)=>new THREE.MeshLambertMaterial({color:hex,flatShading:true});
@@ -38,7 +55,7 @@ function soldier(){
  piece(root,cube,mats.webbing,[.35,.43,.16],[0,1.03,-.26]); // backpack
  piece(root,cube,mats.suit[1],[.52,.26,.35],[0,.71,0]);
  const head=piece(root,sphere,mats.skin,[.23,.26,.23],[0,1.75,.015]);
- piece(root,helmetGeo,mats.helmet,[.29,.18,.30],[0,1.92,0]);
+ const helmet=piece(root,helmetGeo,mats.helmet,[.29,.18,.30],[0,1.92,0]);
  piece(root,cube,mats.visor,[.33,.055,.065],[0,1.87,.25]);
  const legs=[],arms=[];
  for(const side of [-1,1]){
@@ -78,8 +95,27 @@ function soldier(){
  }
  const muzzle=piece(gun,sphere,new THREE.MeshBasicMaterial({color:0xffcf73}),[.15,.15,.20],[0,.025,1.18]);
  muzzle.visible=false;
- root.userData={legs,arms,muzzle,head,torso,gun};
+ const armor=piece(root,cube,mats.gun,[.59,.46,.12],[0,1.24,.285]);
+ const shoulders=[];
+ for(const side of [-1,1])shoulders.push(piece(root,cube,mats.helmet,[.32,.18,.43],[side*.38,1.50,.03]));
+ const drum=piece(gun,cylinder,mats.gun,[.19,.18,.19],[0,-.19,.05]);drum.rotation.x=Math.PI/2;
+ armor.visible=false;drum.visible=false;shoulders.forEach(m=>m.visible=false);
+ root.userData={legs,arms,muzzle,head,torso,gun,helmet,armor,shoulders,drum,kind:null};
  return root;
+}
+
+function appearance(root,type){
+ const d=root.userData;d.kind=type;
+ const cfg=ROBOT_CLASSES[type];
+ root.scale.set(cfg.model,1,cfg.model);
+ d.armor.visible=type==='heavy';
+ d.shoulders.forEach(m=>m.visible=type==='heavy');
+ d.drum.visible=type==='gunner';
+ d.gun.scale.set(type==='gunner'?1.12:1,type==='heavy'?1.10:1,type==='gunner'?1.20:1);
+ d.torso.material=type==='scout'?mats.suit[2]:type==='heavy'?mats.helmet:mats.suit[0];
+ d.helmet.scale.set(type==='heavy'?.33:type==='scout'?.25:.29,type==='heavy'?.23:.18,type==='heavy'?.32:.30);
+ d.helmet.material=type==='gunner'?mats.gun:mats.helmet;
+ d.armor.material=type==='heavy'?mats.helmet:mats.webbing;
 }
 const between=(n,a,b)=>Math.max(a,Math.min(b,n));
 function segmentHitsBuilding(ax,az,bx,bz,building,margin=.5){
@@ -101,7 +137,7 @@ function isClear(map,ax,az,bx,bz){
 }
 function configureSpawns(map){
  const rng=randomizer(map.seed^0x6b7ac031);
- const counts=[12,12,15,13,11,13];
+ const counts=POI_GARRISONS.map(g=>g.length);
  const bots=[];
  for(const [id,p] of map.pois.entries()){
   for(let n=0;n<counts[id];n++){
@@ -114,11 +150,12 @@ function configureSpawns(map){
     if(bots.some(b=>Math.hypot(b.x-x,b.z-z)<3))continue;
     px=x;pz=z;break;
    }
+   const type=POI_GARRISONS[id][n];const spec=ROBOT_CLASSES[type];
    bots.push({
-    id:bots.length,poi:id,x:px,z:pz,homeX:px,homeZ:pz,
-    alive:true,health:100,age:rng()*30,yaw:rng()*6.283,
-    cooldown:1+rng()*3,phase:rng()*6.28,moveX:0,moveZ:0,
-    aiTime:rng(),shotFlash:0,speed:1.0+rng()*.6
+    id:bots.length,poi:id,type,damage:spec.damage,x:px,z:pz,homeX:px,homeZ:pz,
+    alive:true,health:spec.health,maxHealth:spec.health,age:rng()*30,yaw:rng()*6.283,
+    cooldown:spec.cooldown+rng()*1.8,phase:rng()*6.28,moveX:0,moveZ:0,
+    aiTime:rng(),shotFlash:0,speed:spec.speed*(.88+rng()*.25)
    });
   }
  }
@@ -152,7 +189,7 @@ export class EnemySystem {
   for(const b of visible){
    if(this.slots.some(s=>s.id===b.id))continue;
    const slot=this.slots.find(s=>s.id===-1);
-   if(slot){slot.id=b.id;slot.root.visible=true;}
+   if(slot){slot.id=b.id;slot.root.visible=true;appearance(slot.root,b.type);}
   }
   this.active=visible;
  }
@@ -165,33 +202,38 @@ export class EnemySystem {
    const dx=player.x-b.x,dz=player.z-b.z,dist=Math.hypot(dx,dz);
    b.age+=dt;b.shotFlash=Math.max(0,b.shotFlash-dt);
    b.aiTime-=dt;
+   const cfg=ROBOT_CLASSES[b.type];
    if(b.aiTime<=0){
-    b.aiTime=.55+this.rng()*1.1;
-    if(dist<56){b.moveX=dx/(dist||1);b.moveZ=dz/(dist||1);}
-    else{const a=this.rng()*6.283;b.moveX=Math.cos(a);b.moveZ=Math.sin(a);}
+    b.aiTime=b.type==='scout'?.35+this.rng()*.42:.7+this.rng()*.8;
+    if(dist<cfg.range){
+     const forwardX=dx/(dist||1),forwardZ=dz/(dist||1);
+     const flank=b.type==='scout'?(b.id%2?1:-1)*.62:0;
+     b.moveX=forwardX+forwardZ*flank;b.moveZ=forwardZ-forwardX*flank;
+    }else{
+     const angle=this.rng()*Math.PI*2;b.moveX=Math.cos(angle);b.moveZ=Math.sin(angle);
+    }
    }
-   if(dist<85){
+   if(dist<90){
     const desired=Math.atan2(dx,dz);
     let turn=desired-b.yaw;turn=Math.atan2(Math.sin(turn),Math.cos(turn));
-    b.yaw+=between(turn,-dt*2.2,dt*2.2);
+    b.yaw+=between(turn,-dt*2.5,dt*2.5);
    }
-   // Run slowly at player only when far enough, then stop to fire.
-   const speed=dist>13&&dist<60?b.speed:dist>=60?.48:0;
+   const holdRange=b.type==='scout'?8:b.type==='gunner'?25:b.type==='heavy'?13:15;
+   const roamRange=b.type==='heavy'?26:b.type==='gunner'?36:75;
+   const speed=dist>holdRange&&dist<75?b.speed:dist>=75?b.speed*.35:0;
    if(speed>0){
     const nx=b.x+b.moveX*speed*dt,nz=b.z+b.moveZ*speed*dt;
-    if(Math.hypot(nx-b.homeX,nz-b.homeZ)<75&&Math.abs(nx)<484&&Math.abs(nz)<484){
+    if(Math.hypot(nx-b.homeX,nz-b.homeZ)<roamRange&&Math.abs(nx)<484&&Math.abs(nz)<484){
      if(!this.world.blocked(nx,b.z))b.x=nx;
      if(!this.world.blocked(b.x,nz))b.z=nz;
     }
    }
    b.cooldown-=dt;
-   if(dist<62&&dist>3&&b.cooldown<=0&&isClear(this.map,b.x,b.z,player.x,player.z)){
-    b.cooldown=1.2+this.rng()*2.3;
-    b.shotFlash=.09;
-    // Deliberately bad aim, with more missed shots as distance increases.
-    const chance=Math.max(.035,.22-dist*.0024);
-    const hit=this.rng()<chance;
-    this.onShot(b,hit,dist);
+   if(dist<cfg.range&&dist>3&&b.cooldown<=0&&isClear(this.map,b.x,b.z,player.x,player.z)){
+    b.cooldown=cfg.cooldown*(.8+this.rng()*.45);
+    b.shotFlash=.085;
+    const chance=Math.max(.025,cfg.hit-dist*.00155);
+    this.onShot(b,this.rng()<chance,dist);
    }
    const slot=this.slots.find(s=>s.id===b.id);
    if(!slot)continue;
@@ -259,7 +301,9 @@ export class EnemySystem {
   for(const b of this.active){
    if(!b.alive)continue;
    const baseY=height(b.x,b.z);
-   const zones=[{y:baseY+1.72,r:.25,head:true},{y:baseY+1.15,r:.44,head:false},{y:baseY+.55,r:.34,head:false}];
+   const scale=ROBOT_CLASSES[b.type].model;
+   const zones=[{y:baseY+1.72,r:.25*scale,head:true},
+    {y:baseY+1.15,r:.44*scale,head:false},{y:baseY+.55,r:.34*scale,head:false}];
    for(const zone of zones){
     const cx=b.x-origin.x,cy=zone.y-origin.y,cz=b.z-origin.z;
     const t=cx*rayD.x+cy*rayD.y+cz*rayD.z;
