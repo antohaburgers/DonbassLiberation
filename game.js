@@ -1,10 +1,10 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js';
-import {generate,height,clamp,randomizer} from './world-data.js?v=02';
-import {WorldView} from './world-render.js?v=04';
-import {createInput} from './input.js?v=05';
+import {generate,height,clamp,randomizer} from './world-data.js?v=08';
+import {WorldView} from './world-render.js?v=08';
+import {createInput} from './input.js?v=08';
 import {FirstPersonWeapon} from './weapon.js?v=05';
-import {EnemySystem} from './enemies.js?v=06';
-import {CombatAudio} from './combat-audio.js?v=05';
+import {EnemySystem} from './enemies.js?v=08';
+import {CombatAudio} from './combat-audio.js?v=08';
 import {SupplySystem} from './supplies.js?v=08';
 import {GrenadeSystem} from './grenades.js?v=08';
 
