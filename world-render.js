@@ -170,6 +170,33 @@ function villageExtras(map){
   for(const y of [.48,.91])block(fence,.13,.12,length,0,y,0,stuff.timber);
   fence.position.set(b.x+b.w/2+3,height(b.x+b.w/2+3,b.z),b.z);g.add(fence);
  }
+ for(const c of map.covers||[]){
+  const y=height(c.x,c.z),root=new THREE.Group();
+  const kind=c.kind;
+  const material=kind==='barrier'?stuff.gravel:kind==='sandbag'?stuff.straw:
+    kind==='log'?stuff.timber:kind==='container'?stuff.metal:
+    kind==='hay'?stuff.hay:kind==='fence'?stuff.timber:stuff.shade;
+  block(root,c.w,c.h,c.d,0,c.h/2,0,material);
+  if(kind==='container'){
+   for(const x of [-c.w*.38,-c.w*.13,c.w*.13,c.w*.38])
+    block(root,.065,c.h*.92,c.d+.04,x,c.h*.50,0,stuff.shade);
+   for(const z of [-c.d*.48,c.d*.48])
+    block(root,c.w*.98,.12,.10,0,c.h*.83,z,stuff.shade);
+  }else if(kind==='sandbag'){
+   for(let k=0;k<3;k++)
+    block(root,c.w*.32,c.h*.45,c.d*.85,(k-1)*c.w*.29,c.h*.74,0,stuff.hay);
+  }else if(kind==='barrier'){
+   for(const side of [-1,1])block(root,.28,c.h*.62,c.d*.85,side*c.w*.41,c.h*.74,0,stuff.straw);
+  }else if(kind==='fence'){
+   for(let k=0;k<4;k++)block(root,.13,c.h,.15,-c.w/2+k*c.w/3,c.h/2,0,stuff.timber);
+   block(root,c.w,.12,.13,0,c.h*.79,0,stuff.timber);
+  }else if(kind==='log'){
+   block(root,c.w*.90,.16,.16,0,c.h*.88,0,stuff.shade);
+  }else if(kind==='crate'){
+   for(const side of [-1,1])block(root,.12,c.h+.03,c.d+.06,side*c.w*.46,c.h/2,0,stuff.timber);
+  }
+  root.position.set(c.x,y,c.z);root.rotation.y=c.angle||0;g.add(root);
+ }
  for(const p of map.pois){
   const x=p.x+19,z=p.z-16,y=height(x,z);
   block(g,.25,6.7,.25,x,y+3.35,z,stuff.timber);
@@ -325,7 +352,7 @@ export class WorldView{
   for(const b of this.buildings)b.node.visible=Math.hypot(b.data.x-x,b.data.z-z)<290;
  }
  blocked(x,z){
-  for(const b of this.map.buildings)
+  for(const b of [...this.map.buildings,...(this.map.covers||[])])
    if(Math.abs(x-b.x)<b.w/2+.75&&Math.abs(z-b.z)<b.d/2+.75)return true;
   for(const t of this.activeTrees)
    if((t.x-x)**2+(t.z-z)**2<(.42+t.r*.20)**2)return true;
