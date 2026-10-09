@@ -26,36 +26,67 @@ const walls=palette.walls.map(c=>mat(c)),roofs=palette.roofs.map(c=>mat(c,{side:
 const pineMat=mat(0xffffff,{flatShading:true}),leafMat=mat(0xffffff,{flatShading:true});
 const rand=(x,y)=>{let f=Math.sin(x*127.1+y*311.7)*43758.5453;return f-Math.floor(f);};
 function painted(kind){
- const cvs=document.createElement('canvas');cvs.width=cvs.height=256;
- const ctx=cvs.getContext('2d'),pixels=ctx.createImageData(256,256);
- for(let y=0;y<256;y++)for(let x=0;x<256;x++){
-  const broad=rand(Math.floor(x/19),Math.floor(y/19));
-  const medium=rand(Math.floor(x/5)+31,Math.floor(y/5)+17);
-  const small=rand(x+31,y+113);
-  const grain=(broad-.5)*30+(medium-.5)*18+(small-.5)*24;
+ // Persistent, repeating procedural albedo; broad detail is visible from eye height.
+ const cvs=document.createElement('canvas');cvs.width=cvs.height=512;
+ const ctx=cvs.getContext('2d'),pixels=ctx.createImageData(512,512);
+ // Interpolated, tileable value noise prevents hard pixelated squares and seams.
+ function smoothNoise(x,y,frequency){
+  const fx=x/512*frequency,fy=y/512*frequency,ix=Math.floor(fx),iy=Math.floor(fy);
+  const a=fx-ix,b=fy-iy,u=a*a*(3-2*a),v=b*b*(3-2*b),wrap=n=>(n%frequency+frequency)%frequency;
+  const s=(xx,yy)=>rand(wrap(xx)+31*frequency,wrap(yy)+73*frequency);
+  const ab=s(ix,iy)*(1-u)+s(ix+1,iy)*u,cd=s(ix,iy+1)*(1-u)+s(ix+1,iy+1)*u;
+  return ab*(1-v)+cd*v;
+ }
+ for(let y=0;y<512;y++)for(let x=0;x<512;x++){
+  const large=smoothNoise(x,y,5),medium=smoothNoise(x,y,21),fine=smoothNoise(x,y,83);
+  const grit=rand(x+117,y+319)-.5;
   let rgb;
-  if(kind==='grass')rgb=[98+grain+(broad>.63?14:0),115+grain*.8,66+grain*.6];
-  else{
-   const t=x/256,rut=Math.exp(-Math.pow((t-.28)/.055,2))+Math.exp(-Math.pow((t-.72)/.055,2));
-   const edge=Math.min(t,1-t)<.09?16:0;
-   const base=kind==='dirt'?[141,126,96]:[120,106,83];
-   rgb=[base[0]+grain-rut*22+edge,base[1]+grain*.9-rut*21+edge,base[2]+grain*.7-rut*18+edge];
+  if(kind==='grass'){
+   // Olive grass, shaded moss, dry straw, bare soil: pronounced texture patches.
+   const patch=.6*large+.3*medium+.1*fine;
+   const bare=Math.max(0,Math.min(1,(patch-.56)*4.5));
+   const dry=Math.max(0,Math.min(1,(.37-patch)*3.4));
+   const moss=[79,112,63],earth=[139,116,79],straw=[135,133,76];
+   const grass=[91+large*21,115+medium*20,62+fine*12];
+   rgb=grass.map((v,k)=>v*(1-bare)*(1-dry)+earth[k]*bare+straw[k]*dry);
+   const fleck=grit*32+(fine-.5)*27;
+   rgb=[rgb[0]+fleck,rgb[1]+fleck*.82,rgb[2]+fleck*.65];
+  }else{
+   const t=x/512,rut=Math.exp(-Math.pow((t-.30)/.052,2))+Math.exp(-Math.pow((t-.70)/.052,2));
+   const edge=Math.min(t,1-t)<.10?18:0;
+   const base=kind==='dirt'?[143,126,95]:[129,111,84];
+   const grain=(large-.5)*35+(medium-.5)*30+(fine-.5)*20+grit*32;
+   rgb=[base[0]+grain-rut*28+edge,base[1]+grain*.9-rut*27+edge,base[2]+grain*.78-rut*23+edge];
   }
-  const i=(y*256+x)*4;for(let k=0;k<3;k++)pixels.data[i+k]=rgb[k];pixels.data[i+3]=255;
+  const i=(y*512+x)*4;
+  for(let k=0;k<3;k++)pixels.data[i+k]=Math.max(0,Math.min(255,rgb[k]));
+  pixels.data[i+3]=255;
  }
  ctx.putImageData(pixels,0,0);
- if(kind!=='grass'){
+ if(kind==='grass'){
+  // Sprigs, fallen needles and leaf litter produce readable near-field texture.
+  const rng=randomizer(991123);
+  for(let i=0;i<3700;i++){
+   const x=rng()*512,y=rng()*512;
+   ctx.strokeStyle=rng()<.5?'rgba(37,62,27,.30)':'rgba(193,180,113,.28)';
+   ctx.lineWidth=.6+rng()*1.8;ctx.beginPath();
+   ctx.moveTo(x,y);ctx.lineTo(x+(rng()-.5)*4,y-1-rng()*10);ctx.stroke();
+  }
+ }else{
   const rng=randomizer(kind==='dirt'?874:664);
-  for(let i=0;i<260;i++){
-   const x=rng()*256,y=rng()*256;
-   ctx.strokeStyle=rng()<.5?'rgba(44,36,28,.12)':'rgba(230,204,149,.13)';
-   ctx.lineWidth=.4+rng()*1.3;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+(rng()-.5)*3,y+5+rng()*16);ctx.stroke();
+  for(let i=0;i<620;i++){
+   const x=rng()*512,y=rng()*512;
+   ctx.strokeStyle=rng()<.5?'rgba(44,36,28,.23)':'rgba(230,204,149,.20)';
+   ctx.lineWidth=.5+rng()*2;ctx.beginPath();ctx.moveTo(x,y);
+   ctx.lineTo(x+(rng()-.5)*4,y+7+rng()*27);ctx.stroke();
   }
  }
  const tex=new THREE.CanvasTexture(cvs);tex.wrapS=tex.wrapT=THREE.RepeatWrapping;
- tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=4;return tex;
+ tex.colorSpace=THREE.SRGBColorSpace;
+ tex.magFilter=THREE.LinearFilter;tex.minFilter=THREE.LinearMipmapLinearFilter;
+ tex.generateMipmaps=true;tex.anisotropy=8;return tex;
 }
-const groundTexture=painted('grass');groundTexture.repeat.set(14,14);
+const groundTexture=painted('grass');groundTexture.repeat.set(4,4);
 const grassMaterial=mat(0xffffff,{map:groundTexture,vertexColors:true});
 const roadMaterial=mat(0xffffff,{map:painted('dirt'),side:THREE.DoubleSide});
 const trackMaterial=mat(0xffffff,{map:painted('track'),side:THREE.DoubleSide});
@@ -198,8 +229,25 @@ export class WorldView{
   for(let i=0;i<positions.count;i++){
    const x=ox+positions.getX(i),z=oz+positions.getZ(i);
    positions.setY(i,height(x,z));
-   const wave=(Math.sin(x*.017+this.map.seed*.00001)+Math.cos(z*.019))*.5;
-   const c=new THREE.Color().setRGB(.82+wave*.05,.85+wave*.04,.73+wave*.04);
+   // Broad biome mottling in continuous world coordinates avoids tile seams.
+   const hash=(ix,iz)=>rand(ix+this.map.seed%10007,iz+Math.floor(this.map.seed/10007));
+   const noise=(size)=>{
+    const sx=x/size,sz=z/size,ax=Math.floor(sx),az=Math.floor(sz);
+    const fx=sx-ax,fz=sz-az,u=fx*fx*(3-2*fx),v=fz*fz*(3-2*fz);
+    const n0=hash(ax,az)*(1-u)+hash(ax+1,az)*u;
+    const n1=hash(ax,az+1)*(1-u)+hash(ax+1,az+1)*u;
+    return n0*(1-v)+n1*v;
+   };
+   const nBig=noise(69),nMid=noise(23),nSmall=noise(7.5);
+   const meadow=.6*nBig+.4*nMid;
+   const dry=Math.max(0,Math.min(1,(meadow-.54)*2.65));
+   const moss=Math.max(0,Math.min(1,(.43-meadow)*2.65));
+   const variation=(nSmall-.5)*.20;
+   const c=new THREE.Color().setRGB(
+     .97+dry*.20-moss*.10+variation,
+     1.06-dry*.16+moss*.12+variation*.85,
+     .90+dry*.03-moss*.08+variation*.55
+   );
    colors.push(c.r,c.g,c.b);
   }
   geo.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));geo.computeVertexNormals();
