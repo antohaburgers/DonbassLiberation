@@ -57,13 +57,13 @@ export function generate(seed){
 export function treesForChunk(cx,cz,map){
  const rng=randomizer((map.seed^Math.imul(cx+11,73856093)^Math.imul(cz+17,19349663))>>>0);
  const trees=[];
- for(let i=0;i<48;i++){
+ for(let i=0;i<148;i++){
   const x=-500+(cx+rng())*125,z=-500+(cz+rng())*125;
   const nearPoi=map.pois.some(p=>Math.hypot(p.x-x,p.z-z)<(p.type==='village'?75:63));
   const byRoad=roadDistance(x,z,map.roads)<11;
   const field= Math.sin(x*.017+map.seed*.00001)+Math.cos(z*.019);
   const density=field>.4?.84:field<-.8?.13:.42;
-  if(!nearPoi&&!byRoad&&rng()<density)trees.push({x,z,r:1.1+rng()*1.3,h:7+rng()*5,tone:Math.floor(rng()*4)});
+  if(!nearPoi&&!byRoad&&rng()<density)trees.push({x,z,r:1.25+rng()*1.5,h:8+rng()*6,tone:Math.floor(rng()*4),pine:rng()<.56,angle:rng()*6.28});
  }
  return trees;
 }
