@@ -2,9 +2,10 @@ export function createInput(canvas){
  const keys=new Set(),stick=document.getElementById('stick'),nub=document.getElementById('nub');
  const runBtn=document.getElementById('runBtn'),jumpBtn=document.getElementById('jumpBtn');
  const fireBtn=document.getElementById('fireBtn'),reloadBtn=document.getElementById('reloadBtn');
+ const grenadeBtn=document.getElementById('grenadeBtn');
  let leftId=null,lookId=null,lastX=0,lastY=0,sx=0,sy=0;
  let yawDelta=0,pitchDelta=0,jump=false,run=false,shooting=false,reloadRequested=false;
- let gamepadJump=false,gamepadReload=false,mouseDown=false,fireTouchId=null;
+ let gamepadJump=false,gamepadReload=false,gamepadThrow=false,grenadeRequested=false,mouseDown=false,fireTouchId=null;
  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
  function updateStick(e){
   const r=stick.getBoundingClientRect(),dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2),max=r.width*.35;
@@ -36,7 +37,11 @@ export function createInput(canvas){
  document.addEventListener('mousemove',e=>{
   if(document.pointerLockElement===canvas){yawDelta-=e.movementX*.0024;pitchDelta-=e.movementY*.0024;}
  });
- addEventListener('keydown',e=>{keys.add(e.code);if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();});
+ addEventListener('keydown',e=>{
+   if(e.code==='KeyG'&&!e.repeat&&!keys.has('KeyG'))grenadeRequested=true;
+   keys.add(e.code);
+   if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();
+ });
  addEventListener('keyup',e=>keys.delete(e.code));
  addEventListener('blur',()=>{keys.clear();sx=sy=0;run=false;shooting=false;mouseDown=false;});
  runBtn.addEventListener('pointerdown',e=>{e.preventDefault();run=true;runBtn.setPointerCapture(e.pointerId);});
@@ -48,12 +53,14 @@ export function createInput(canvas){
  const endFire=e=>{if(fireTouchId===e.pointerId){shooting=false;fireTouchId=null;}};
  fireBtn?.addEventListener('pointerup',endFire);fireBtn?.addEventListener('pointercancel',endFire);
  reloadBtn?.addEventListener('pointerdown',e=>{e.preventDefault();reloadRequested=true;});
+ grenadeBtn?.addEventListener('pointerdown',e=>{e.preventDefault();grenadeRequested=true;});
  return {
   frame(dt){
    let strafe=sx+(keys.has('KeyD')||keys.has('ArrowRight')?1:0)-(keys.has('KeyA')||keys.has('ArrowLeft')?1:0);
    let forward=-sy+(keys.has('KeyW')||keys.has('ArrowUp')?1:0)-(keys.has('KeyS')||keys.has('ArrowDown')?1:0);
    let sprint=run||keys.has('ShiftLeft')||keys.has('ShiftRight'),fire=shooting||mouseDown;
    let reload=reloadRequested||keys.has('KeyR');
+   let grenade=grenadeRequested;
    const pads=navigator.getGamepads?navigator.getGamepads():[];
    const pad=Array.from(pads||[]).find(p=>p&&p.connected);
    if(pad){
@@ -68,11 +75,14 @@ export function createInput(canvas){
     const x=!!pad.buttons[2]?.pressed;
     if(x&&!gamepadReload)reload=true;
     gamepadReload=x;
+    const lb=!!pad.buttons[4]?.pressed;
+    if(lb&&!gamepadThrow)grenade=true;
+    gamepadThrow=lb;
    }
    const mag=Math.max(1,Math.hypot(strafe,forward));strafe/=mag;forward/=mag;
-   const result={strafe,forward,sprint,jump:jump||keys.has('Space'),dyaw:yawDelta,dpitch:pitchDelta,fire,reload};
-   yawDelta=0;pitchDelta=0;jump=false;reloadRequested=false;return result;
+   const result={strafe,forward,sprint,jump:jump||keys.has('Space'),dyaw:yawDelta,dpitch:pitchDelta,fire,reload,grenade};
+   yawDelta=0;pitchDelta=0;jump=false;reloadRequested=false;grenadeRequested=false;return result;
   },
-  clearFire(){mouseDown=false;shooting=false;reloadRequested=false;}
+  clearFire(){mouseDown=false;shooting=false;reloadRequested=false;grenadeRequested=false;}
  };
 }
